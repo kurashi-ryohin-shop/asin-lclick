@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASIN 万能ワンクリックコピーツール</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Noto Sans JP', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+        }
+        .asin-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateY(16px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes toastOut {
+            from { opacity: 1; transform: translateY(0) scale(1); }
+            to { opacity: 0; transform: translateY(10px) scale(0.95); }
+        }
+        .animate-toast-in {
+            animation: toastIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .animate-toast-out {
+            animation: toastOut 0.18s cubic-bezier(0.7, 0, 0.84, 0) forwards;
+        }
+        .drag-active {
+            border-color: #6366f1 !important;
+            background-color: #eef2ff !important;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen pb-24">
+
+    <!-- Header & Progress Bar -->
+    <header class="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 py-3 sm:px-6">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                
+                <!-- Title & Import Toggle -->
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="bg-gradient-to-tr from-indigo-600 to-violet-600 text-white p-2 rounded-xl shadow-md">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h1 class="text-lg font-bold text-slate-900 leading-tight">ASIN 1-Click Copy Manager</h1>
+                            <p class="text-xs text-slate-500" id="list-subtitle">現在のリスト: 39件</p>
+                        </div>
+                    </div>
+
+                    <button 
+                        id="toggle-import-panel" 
+                        class="md:hidden inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-xs rounded-lg transition"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        リストの読み込み
+                    </button>
+                </div>
+
+                <!-- Progress & Main Action -->
+                <div class="flex items-center gap-3">
+                    <!-- Progress Card -->
+                    <div class="flex items-center gap-3 bg-slate-100/80 px-3.5 py-1.5 rounded-xl border border-slate-200/80">
+                        <div class="text-xs sm:text-sm">
+                            <span class="text-slate-500 font-medium">進捗:</span>
+                            <span id="copied-count" class="font-bold text-indigo-600">0</span>
+                            <span class="text-slate-400">/</span>
+                            <span id="total-count" class="font-bold text-slate-700">39</span>
+                        </div>
+                        <div class="w-24 sm:w-32 bg-slate-200 h-2.5 rounded-full overflow-hidden">
+                            <div id="progress-bar" class="bg-gradient-to-r from-indigo-500 to-emerald-500 h-full w-0 transition-all duration-300 rounded-full"></div>
+                        </div>
+                        <span id="progress-percent" class="text-xs font-bold text-slate-600 min-w-[32px] text-right">0%</span>
+                    </div>
+
+                    <!-- Top Import Toggle Button (Desktop) -->
+                    <button 
+                        id="toggle-import-panel-desktop" 
+                        class="hidden md:inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-semibold text-xs sm:text-sm rounded-xl shadow-sm transition"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        </svg>
+                        リストを編集 / 新規読み込み
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 pt-6">
+
+        <!-- Collapsible Import / Input Drawer -->
+        <div id="import-panel" class="hidden mb-6 bg-white rounded-2xl border border-slate-200 shadow-md p-5 transition-all">
+            <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+                <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                    </svg>
+                    新しいASINリストを取り込む
+                </h2>
+                <button id="close-import-panel" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Dropzone / File Upload -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">1. CSV / TXT ファイルから読み込み</label>
+                    <div 
+                        id="drop-zone"
+                        class="border-2 border-dashed border-slate-300 hover:border-indigo-400 bg-slate-50 rounded-xl p-6 text-center cursor-pointer transition flex flex-col items-center justify-center min-h-[160px]"
+                    >
+                        <svg class="w-10 h-10 text-indigo-500/70 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <p class="text-sm font-semibold text-slate-700">ファイルをドラッグ＆ドロップ</p>
+                        <p class="text-xs text-slate-400 mt-1">KeepaのエクスポートCSV、またはASINテキストファイル</p>
+                        <input type="file" id="file-input" accept=".csv, .txt" class="hidden">
+                        <button type="button" onclick="document.getElementById('file-input').click()" class="mt-3 px-3 py-1.5 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-semibold rounded-lg shadow-2xs">
+                            ファイルを選択
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Text Area Input -->
+                <div class="flex flex-col">
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">2. テキスト・URLを直接貼り付け</label>
+                    <textarea 
+                        id="paste-textarea" 
+                        rows="5" 
+                        placeholder="例: B0DRD697NV, B0G7XXNH63 またはAmazon URLを貼り付け（自動でASINを抽出します）"
+                        class="w-full p-3 text-xs asin-mono bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white resize-none flex-1"
+                    ></textarea>
+                    
+                    <div class="flex flex-wrap items-center justify-between gap-2 mt-3">
+                        <button id="restore-default-btn" type="button" class="text-xs text-slate-500 hover:text-indigo-600 underline">
+                            初期39件リストに戻す
+                        </button>
+                        
+                        <div class="flex items-center gap-2">
+                            <button id="append-asin-btn" type="button" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition">
+                                既存リストに追記
+                            </button>
+                            <button id="replace-asin-btn" type="button" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl shadow-xs transition">
+                                置換して新規作成
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toolbar / Action Bar -->
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mb-6 space-y-4">
+            
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                
+                <!-- Search Field -->
+                <div class="relative flex-1">
+                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                    </div>
+                    <input 
+                        type="text" 
+                        id="search-input" 
+                        placeholder="ASIN または 番号 (#1など) で検索..." 
+                        class="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition"
+                    >
+                    <button id="clear-search" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Filter Tabs -->
+                <div class="flex bg-slate-100 p-1 rounded-xl text-xs font-medium self-start md:self-auto">
+                    <button id="filter-all" class="px-3.5 py-1.5 rounded-lg bg-white shadow-xs text-slate-800 font-semibold transition">すべて (<span id="count-filter-all">39</span>)</button>
+                    <button id="filter-uncopied" class="px-3.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">未コピー (<span id="count-filter-uncopied">39</span>)</button>
+                    <button id="filter-copied" class="px-3.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">コピー済 (<span id="count-filter-copied">0</span>)</button>
+                </div>
+
+            </div>
+
+            <!-- Operational Buttons -->
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100">
+                <div class="flex flex-wrap items-center gap-2">
+                    <!-- Spacebar Next Copy Button -->
+                    <button id="copy-next-btn" class="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path>
+                        </svg>
+                        次の未コピーをコピー <span class="ml-1 text-[10px] bg-emerald-800/60 text-emerald-100 px-1.5 py-0.5 rounded border border-emerald-500/30 font-mono hidden sm:inline">Space</span>
+                    </button>
+
+                    <!-- Copy All Button -->
+                    <button id="copy-all-btn" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 text-xs sm:text-sm font-semibold rounded-xl transition">
+                        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                        </svg>
+                        表示中を一括コピー
+                    </button>
+                </div>
+
+                <!-- Reset Copied Button -->
+                <button id="reset-btn" class="inline-flex items-center gap-1 px-3 py-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl text-xs sm:text-sm font-medium transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    コピー進捗リセット
+                </button>
+            </div>
+
+        </div>
+
+        <!-- Card Grid -->
+        <div id="asin-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            <!-- Cards rendered dynamically -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="hidden py-16 text-center bg-white rounded-2xl border border-slate-200 mt-4">
+            <svg class="w-12 h-12 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+            <p class="text-slate-600 font-bold">表示対象のASINがありません</p>
+            <p class="text-xs text-slate-400 mt-1">上部の「リストの読み込み」から新しいASINを追加できます。</p>
+        </div>
+
+    </main>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <script>
+        const DEFAULT_ASIN_LIST = [
+            "B0DRD697NV", "B0G7XXNH63", "B0D5415Q27", "B0F2T761YH", "B0HJQVWDHW",
+            "B0H1VD49S9", "B0BTHRX53N", "B0HBVDGX6X", "B0D8Q93VMG", "B0HCZGHTDQ",
+            "B0HCZSFZ9B", "B0H291D7FQ", "B0H61Z3XF2", "B0DL5JC6HP", "B0HF898BXP",
+            "B0HKM2LQZP", "B0HL86GLLC", "B0HL7SWJBF", "B0D4M1L6LP", "B0DZXMB48B",
+            "B0GCDV7B3L", "B0CX92ZZS6", "B0BXDL9LHK", "B0CKQSX6CS", "B07NCGD54S",
+            "B0GWZ2QWJD", "B0FKBJXHTK", "B0H11Q654L", "B0FR54BMDR", "B0HFHVN4FG",
+            "B0HGX8BT6F", "B0FPXGX5FJ", "B0HJ1HHD1T", "B0GYF4R9TN", "B0F47RMDF6",
+            "B0HKFYDGFD", "B0H3ZXV87T", "B0HKFW5Q8Z", "B0H2TYFV9B"
+        ];
+
+        let currentAsinList = [];
+        let copiedSet = new Set();
+        let currentFilter = 'all';
+        let searchQuery = '';
+
+        function loadState() {
+            try {
+                const storedList = localStorage.getItem('universal_asin_list');
+                if (storedList) {
+                    currentAsinList = JSON.parse(storedList);
+                } else {
+                    currentAsinList = [...DEFAULT_ASIN_LIST];
+                }
+
+                const storedCopied = localStorage.getItem('universal_asin_copied');
+                if (storedCopied) {
+                    copiedSet = new Set(JSON.parse(storedCopied));
+                }
+            } catch (e) {
+                currentAsinList = [...DEFAULT_ASIN_LIST];
+            }
+        }
+
+        function saveState() {
+            try {
+                localStorage.setItem('universal_asin_list', JSON.stringify(currentAsinList));
+                localStorage.setItem('universal_asin_copied', JSON.stringify(Array.from(copiedSet)));
+            } catch (e) {}
+        }
+
+        function extractASINs(rawText) {
+            if (!rawText) return [];
+            const asinRegex = /\b(B0[A-Z0-9]{8}|[0-9]{9}[0-9X])\b/gi;
+            const matches = rawText.match(asinRegex) || [];
+            const uniqueAsins = [];
+            const seen = new Set();
+            for (const match of matches) {
+                const upper = match.toUpperCase();
+                if (!seen.has(upper)) {
+                    seen.add(upper);
+                    uniqueAsins.push(upper);
+                }
+            }
+            return uniqueAsins;
+        }
+
+        function copyToClipboard(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                return navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+            } else {
+                return fallbackCopy(text);
+            }
+        }
+
+        function fallbackCopy(text) {
+            return new Promise((resolve, reject) => {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.left = '-9999px';
+                textarea.style.top = '0';
+                textarea.setAttribute('readonly', '');
+                document.body.appendChild(textarea);
+                textarea.select();
+                textarea.setSelectionRange(0, 99999);
+                try {
+                    const successful = document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    if (successful) resolve();
+                    else reject(new Error('ExecCommand failed'));
+                } catch (err) {
+                    document.body.removeChild(textarea);
+                    reject(err);
+                }
+            });
+        }
+
+        function showToast(message, isSuccess = true) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            toast.className = `flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-xl border text-xs sm:text-sm font-semibold pointer-events-auto transform transition-all ${
+                isSuccess 
+                    ? 'bg-slate-900 text-white border-slate-800' 
+                    : 'bg-rose-600 text-white border-rose-700'
+            } animate-toast-in`;
+
+            const iconSvg = isSuccess 
+                ? `<svg class="w-4 h-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>`
+                : `<svg class="w-4 h-4 text-rose-200 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+
+            toast.innerHTML = `${iconSvg} <span>${message}</span>`;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.remove('animate-toast-in');
+                toast.classList.add('animate-toast-out');
+                setTimeout(() => toast.remove(), 200);
+            }, 2200);
+        }
+
+        function updateProgress() {
+            const total = currentAsinList.length;
+            const copied = currentAsinList.filter(a => copiedSet.has(a)).length;
+            const percent = total > 0 ? Math.round((copied / total) * 100) : 0;
+
+            document.getElementById('copied-count').textContent = copied;
+            document.getElementById('total-count').textContent = total;
+            document.getElementById('progress-bar').style.width = `${percent}%`;
+            document.getElementById('progress-percent').textContent = `${percent}%`;
+            document.getElementById('list-subtitle').textContent = `現在のリスト: 全 ${total} 件`;
+
+            document.getElementById('count-filter-all').textContent = total;
+            document.getElementById('count-filter-uncopied').textContent = total - copied;
+            document.getElementById('count-filter-copied').textContent = copied;
+        }
+
+        function handleCopyASIN(asin, index) {
+            copyToClipboard(asin).then(() => {
+                copiedSet.add(asin);
+                saveState();
+                updateProgress();
+                renderGrid();
+                showToast(`ASIN: ${asin} をコピーしました (#${index + 1})`);
+            }).catch(() => {
+                showToast(`コピーに失敗しました`, false);
+            });
+        }
+
+        function copyNextUncopied() {
+            const nextIndex = currentAsinList.findIndex(asin => !copiedSet.has(asin));
+            if (nextIndex === -1) {
+                showToast("すべてのASINがコピー済みです！", true);
+                return;
+            }
+            const nextAsin = currentAsinList[nextIndex];
+            
+            copyToClipboard(nextAsin).then(() => {
+                copiedSet.add(nextAsin);
+                saveState();
+                updateProgress();
+                renderGrid();
+                
+                setTimeout(() => {
+                    const targetCard = document.querySelector(`[data-asin="${nextAsin}"]`);
+                    if (targetCard) {
+                        targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }, 50);
+
+                showToast(`順次コピー (#${nextIndex + 1}): ${nextAsin}`);
+            }).catch(() => {
+                showToast(`コピーに失敗しました`, false);
+            });
+        }
+
+        function renderGrid() {
+            const grid = document.getElementById('asin-grid');
+            const emptyState = document.getElementById('empty-state');
+            grid.innerHTML = '';
+
+            const filteredItems = currentAsinList.map((asin, index) => ({ asin, index }))
+                .filter(({ asin, index }) => {
+                    const isCopied = copiedSet.has(asin);
+
+                    if (currentFilter === 'uncopied' && isCopied) return false;
+                    if (currentFilter === 'copied' && !isCopied) return false;
+
+                    if (searchQuery) {
+                        const q = searchQuery.toLowerCase();
+                        const asinMatch = asin.toLowerCase().includes(q);
+                        const indexMatch = (index + 1).toString().includes(q);
+                        return asinMatch || indexMatch;
+                    }
+                    return true;
+                });
+
+            if (filteredItems.length === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            filteredItems.forEach(({ asin, index }) => {
+                const isCopied = copiedSet.has(asin);
+                const cardIndex = index + 1;
+
+                const card = document.createElement('div');
+                card.setAttribute('data-asin', asin);
+                card.className = `relative group flex items-center justify-between p-3.5 rounded-xl border transition-all cursor-pointer ${
+                    isCopied 
+                        ? 'bg-emerald-50/60 border-emerald-200 shadow-none hover:bg-emerald-100/60' 
+                        : 'bg-white border-slate-200 hover:border-indigo-400 hover:shadow-md'
+                }`;
+
+                card.innerHTML = `
+                    <div class="flex items-center space-x-3 min-w-0 pr-2">
+                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg text-xs font-bold shrink-0 ${
+                            isCopied ? 'bg-emerald-200/80 text-emerald-800' : 'bg-slate-100 text-slate-500'
+                        }">
+                            #${cardIndex}
+                        </span>
+
+                        <div class="flex items-center space-x-2 min-w-0">
+                            <span class="asin-mono text-base font-bold tracking-wider ${
+                                isCopied ? 'text-emerald-950 line-through decoration-emerald-500/50' : 'text-slate-800 group-hover:text-indigo-600'
+                            }">
+                                ${asin}
+                            </span>
+                            ${
+                                isCopied 
+                                    ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white shrink-0">済</span>` 
+                                    : ''
+                            }
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-1.5 shrink-0">
+                        <a 
+                            href="https://www.amazon.co.jp/dp/${asin}" 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            title="Amazonで商品ページを開く"
+                            class="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition"
+                            onclick="event.stopPropagation();"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                            </svg>
+                        </a>
+
+                        <button 
+                            class="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition active:scale-95 ${
+                                isCopied 
+                                    ? 'bg-emerald-600 text-white' 
+                                    : 'bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white group-hover:bg-indigo-600 group-hover:text-white'
+                            }"
+                        >
+                            ${
+                                isCopied 
+                                    ? `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg> 完了` 
+                                    : `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg> コピー`
+                            }
+                        </button>
+                    </div>
+                `;
+
+                card.addEventListener('click', () => {
+                    handleCopyASIN(asin, index);
+                });
+
+                grid.appendChild(card);
+            });
+        }
+
+        function processImportText(text, isAppend = false) {
+            const extracted = extractASINs(text);
+            if (extracted.length === 0) {
+                showToast("有効なASINが検出されませんでした", false);
+                return;
+            }
+
+            if (isAppend) {
+                const combined = [...currentAsinList];
+                let addedCount = 0;
+                extracted.forEach(asin => {
+                    if (!combined.includes(asin)) {
+                        combined.push(asin);
+                        addedCount++;
+                    }
+                });
+                currentAsinList = combined;
+                showToast(`${addedCount}件の新しいASINを追加しました`);
+            } else {
+                currentAsinList = extracted;
+                copiedSet.clear();
+                showToast(`${extracted.length}件のASINを新規読み込みしました`);
+            }
+
+            saveState();
+            updateProgress();
+            renderGrid();
+
+            document.getElementById('paste-textarea').value = '';
+            document.getElementById('import-panel').classList.add('hidden');
+        }
+
+        function setupEventListeners() {
+            const importPanel = document.getElementById('import-panel');
+            const toggleBtn = document.getElementById('toggle-import-panel');
+            const toggleDesktopBtn = document.getElementById('toggle-import-panel-desktop');
+            const closeBtn = document.getElementById('close-import-panel');
+
+            const toggleDrawer = () => importPanel.classList.toggle('hidden');
+            toggleBtn.addEventListener('click', toggleDrawer);
+            toggleDesktopBtn.addEventListener('click', toggleDrawer);
+            closeBtn.addEventListener('click', () => importPanel.classList.add('hidden'));
+
+            const dropZone = document.getElementById('drop-zone');
+            const fileInput = document.getElementById('file-input');
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dropZone.classList.add('drag-active');
+                });
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('drag-active');
+                });
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                const files = e.dataTransfer.files;
+                if (files.length > 0) handleFile(files[0]);
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) handleFile(e.target.files[0]);
+            });
+
+            function handleFile(file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    processImportText(event.target.result, false);
+                };
+                reader.readAsText(file);
+            }
+
+            document.getElementById('replace-asin-btn').addEventListener('click', () => {
+                const val = document.getElementById('paste-textarea').value;
+                processImportText(val, false);
+            });
+
+            document.getElementById('append-asin-btn').addEventListener('click', () => {
+                const val = document.getElementById('paste-textarea').value;
+                processImportText(val, true);
+            });
+
+            document.getElementById('restore-default-btn').addEventListener('click', () => {
+                currentAsinList = [...DEFAULT_ASIN_LIST];
+                copiedSet.clear();
+                saveState();
+                updateProgress();
+                renderGrid();
+                showToast("初期の39件リストに復元しました");
+                importPanel.classList.add('hidden');
+            });
+
+            const searchInput = document.getElementById('search-input');
+            const clearSearchBtn = document.getElementById('clear-search');
+
+            searchInput.addEventListener('input', (e) => {
+                searchQuery = e.target.value.trim();
+                if (searchQuery) clearSearchBtn.classList.remove('hidden');
+                else clearSearchBtn.classList.add('hidden');
+                renderGrid();
+            });
+
+            clearSearchBtn.addEventListener('click', () => {
+                searchInput.value = '';
+                searchQuery = '';
+                clearSearchBtn.classList.add('hidden');
+                renderGrid();
+            });
+
+            const filterAllBtn = document.getElementById('filter-all');
+            const filterUncopiedBtn = document.getElementById('filter-uncopied');
+            const filterCopiedBtn = document.getElementById('filter-copied');
+
+            function setFilter(filter, activeBtn) {
+                currentFilter = filter;
+                [filterAllBtn, filterUncopiedBtn, filterCopiedBtn].forEach(btn => {
+                    btn.className = 'px-3.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition font-normal';
+                });
+                activeBtn.className = 'px-3.5 py-1.5 rounded-lg bg-white shadow-xs text-slate-800 font-semibold transition';
+                renderGrid();
+            }
+
+            filterAllBtn.addEventListener('click', () => setFilter('all', filterAllBtn));
+            filterUncopiedBtn.addEventListener('click', () => setFilter('uncopied', filterUncopiedBtn));
+            filterCopiedBtn.addEventListener('click', () => setFilter('copied', filterCopiedBtn));
+
+            document.getElementById('copy-next-btn').addEventListener('click', () => {
+                copyNextUncopied();
+            });
+
+            document.getElementById('copy-all-btn').addEventListener('click', () => {
+                const searchQ = searchQuery.toLowerCase();
+                const filtered = currentAsinList.filter((asin, index) => {
+                    if (currentFilter === 'uncopied' && copiedSet.has(asin)) return false;
+                    if (currentFilter === 'copied' && !copiedSet.has(asin)) return false;
+                    if (searchQ) {
+                        return asin.toLowerCase().includes(searchQ) || (index + 1).toString().includes(searchQ);
+                    }
+                    return true;
+                });
+
+                if (filtered.length === 0) {
+                    showToast("コピー対象のASINがありません", false);
+                    return;
+                }
+
+                copyToClipboard(filtered.join('\n')).then(() => {
+                    filtered.forEach(asin => copiedSet.add(asin));
+                    saveState();
+                    updateProgress();
+                    renderGrid();
+                    showToast(`${filtered.length}件を表示順に一括コピーしました！`);
+                }).catch(() => {
+                    showToast("一括コピーに失敗しました", false);
+                });
+            });
+
+            document.getElementById('reset-btn').addEventListener('click', () => {
+                if (copiedSet.size === 0) {
+                    showToast("コピー履歴は空です", false);
+                    return;
+                }
+                copiedSet.clear();
+                saveState();
+                updateProgress();
+                renderGrid();
+                showToast("コピー進捗をリセットしました");
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+                if (e.code === 'Space') {
+                    e.preventDefault();
+                    copyNextUncopied();
+                }
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            loadState();
+            updateProgress();
+            setupEventListeners();
+            renderGrid();
+        });
+    </script>
+</body>
+</html>

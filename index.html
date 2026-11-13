@@ -65,7 +65,7 @@
                         </div>
                         <div>
                             <h1 class="text-lg font-bold text-slate-900 leading-tight">ASIN 1-Click Copy Manager</h1>
-                            <p class="text-xs text-slate-500" id="list-subtitle">現在のリスト: 39件</p>
+                            <p class="text-xs text-slate-500" id="list-subtitle">現在のリスト: 0件</p>
                         </div>
                     </div>
 
@@ -88,7 +88,7 @@
                             <span class="text-slate-500 font-medium">進捗:</span>
                             <span id="copied-count" class="font-bold text-indigo-600">0</span>
                             <span class="text-slate-400">/</span>
-                            <span id="total-count" class="font-bold text-slate-700">39</span>
+                            <span id="total-count" class="font-bold text-slate-700">0</span>
                         </div>
                         <div class="w-24 sm:w-32 bg-slate-200 h-2.5 rounded-full overflow-hidden">
                             <div id="progress-bar" class="bg-gradient-to-r from-indigo-500 to-emerald-500 h-full w-0 transition-all duration-300 rounded-full"></div>
@@ -163,7 +163,7 @@
                     
                     <div class="flex flex-wrap items-center justify-between gap-2 mt-3">
                         <button id="restore-default-btn" type="button" class="text-xs text-slate-500 hover:text-indigo-600 underline">
-                            初期39件リストに戻す
+                            リストをクリア
                         </button>
                         
                         <div class="flex items-center gap-2">
@@ -206,8 +206,8 @@
 
                 <!-- Filter Tabs -->
                 <div class="flex bg-slate-100 p-1 rounded-xl text-xs font-medium self-start md:self-auto">
-                    <button id="filter-all" class="px-3.5 py-1.5 rounded-lg bg-white shadow-xs text-slate-800 font-semibold transition">すべて (<span id="count-filter-all">39</span>)</button>
-                    <button id="filter-uncopied" class="px-3.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">未コピー (<span id="count-filter-uncopied">39</span>)</button>
+                    <button id="filter-all" class="px-3.5 py-1.5 rounded-lg bg-white shadow-xs text-slate-800 font-semibold transition">すべて (<span id="count-filter-all">0</span>)</button>
+                    <button id="filter-uncopied" class="px-3.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">未コピー (<span id="count-filter-uncopied">0</span>)</button>
                     <button id="filter-copied" class="px-3.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">コピー済 (<span id="count-filter-copied">0</span>)</button>
                 </div>
 
@@ -264,16 +264,8 @@
     <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
     <script>
-        const DEFAULT_ASIN_LIST = [
-            "B0DRD697NV", "B0G7XXNH63", "B0D5415Q27", "B0F2T761YH", "B0HJQVWDHW",
-            "B0H1VD49S9", "B0BTHRX53N", "B0HBVDGX6X", "B0D8Q93VMG", "B0HCZGHTDQ",
-            "B0HCZSFZ9B", "B0H291D7FQ", "B0H61Z3XF2", "B0DL5JC6HP", "B0HF898BXP",
-            "B0HKM2LQZP", "B0HL86GLLC", "B0HL7SWJBF", "B0D4M1L6LP", "B0DZXMB48B",
-            "B0GCDV7B3L", "B0CX92ZZS6", "B0BXDL9LHK", "B0CKQSX6CS", "B07NCGD54S",
-            "B0GWZ2QWJD", "B0FKBJXHTK", "B0H11Q654L", "B0FR54BMDR", "B0HFHVN4FG",
-            "B0HGX8BT6F", "B0FPXGX5FJ", "B0HJ1HHD1T", "B0GYF4R9TN", "B0F47RMDF6",
-            "B0HKFYDGFD", "B0H3ZXV87T", "B0HKFW5Q8Z", "B0H2TYFV9B"
-        ];
+        // 初期状態は空。ASINはCSV/TXTの読み込みまたは直接入力で追加します。
+        const DEFAULT_ASIN_LIST = [];
 
         let currentAsinList = [];
         let copiedSet = new Set();
@@ -282,14 +274,14 @@
 
         function loadState() {
             try {
-                const storedList = localStorage.getItem('universal_asin_list');
+                const storedList = localStorage.getItem('universal_asin_list_v2');
                 if (storedList) {
                     currentAsinList = JSON.parse(storedList);
                 } else {
                     currentAsinList = [...DEFAULT_ASIN_LIST];
                 }
 
-                const storedCopied = localStorage.getItem('universal_asin_copied');
+                const storedCopied = localStorage.getItem('universal_asin_copied_v2');
                 if (storedCopied) {
                     copiedSet = new Set(JSON.parse(storedCopied));
                 }
@@ -300,8 +292,8 @@
 
         function saveState() {
             try {
-                localStorage.setItem('universal_asin_list', JSON.stringify(currentAsinList));
-                localStorage.setItem('universal_asin_copied', JSON.stringify(Array.from(copiedSet)));
+                localStorage.setItem('universal_asin_list_v2', JSON.stringify(currentAsinList));
+                localStorage.setItem('universal_asin_copied_v2', JSON.stringify(Array.from(copiedSet)));
             } catch (e) {}
         }
 
@@ -385,7 +377,7 @@
             document.getElementById('total-count').textContent = total;
             document.getElementById('progress-bar').style.width = `${percent}%`;
             document.getElementById('progress-percent').textContent = `${percent}%`;
-            document.getElementById('list-subtitle').textContent = `現在のリスト: 全 ${total} 件`;
+            document.getElementById('list-subtitle').textContent = `現在のリスト: ${total}件`;
 
             document.getElementById('count-filter-all').textContent = total;
             document.getElementById('count-filter-uncopied').textContent = total - copied;
@@ -618,12 +610,12 @@
             });
 
             document.getElementById('restore-default-btn').addEventListener('click', () => {
-                currentAsinList = [...DEFAULT_ASIN_LIST];
+                currentAsinList = [];
                 copiedSet.clear();
                 saveState();
                 updateProgress();
                 renderGrid();
-                showToast("初期の39件リストに復元しました");
+                showToast("リストを空にしました");
                 importPanel.classList.add('hidden');
             });
 
